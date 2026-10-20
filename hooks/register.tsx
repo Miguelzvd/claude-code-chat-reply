@@ -7,9 +7,6 @@ const reply = atom({ plugin: 'chat-reply', key: 'reply' } as const, null)
 
 const ACCENT = '#e8833a'
 const MAX_LINES = 4
-// $.ui.selection() keeps answering the last selection after the highlight is gone,
-// so a selection counts as stale after this long or once the person acts elsewhere.
-const TTL_MS = 4000
 // Hovering a selection's edge makes the answer flap to undefined for a moment.
 const GRACE_MS = 600
 
@@ -75,7 +72,6 @@ const preview = (text: string) => {
 export const register: Register = on => {
   let dismissed: string | null = null
   let current: string | null = null
-  let seenAt = 0
   let lastSeenAt = 0
 
   const dismiss = () => {
@@ -105,11 +101,6 @@ export const register: Register = on => {
 
         if (raw !== current) {
           current = raw
-          seenAt = now
-        }
-
-        if (raw !== null && now - seenAt > TTL_MS) {
-          dismissed = raw
         }
 
         const text = raw !== null && raw !== dismissed ? raw : null
