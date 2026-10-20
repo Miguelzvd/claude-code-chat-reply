@@ -57,7 +57,7 @@ const excerptBlock = (ui: { Box: any; Text: any }, lines: string[]) => {
       <ui.Box flexDirection="column" flexGrow={1} flexShrink={1}>
         {lines.map((line, i) => (
           <ui.Text key={i} dimColor>
-            {line}
+            {line === '' ? ' ' : line}
           </ui.Text>
         ))}
       </ui.Box>
