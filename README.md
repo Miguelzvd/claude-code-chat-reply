@@ -13,7 +13,7 @@ Select text in the terminal and a **💬 Reply** button appears above the prompt
 In a Claude Code terminal session:
 
 ```
-/plugin install chat-reply --marketplace Miguelzvd/claude-code-chat-reply
+/plugin install chat-reply --marketplace Miguelzvd/miguelzvd-claude-code-plugins
 ```
 
 Answer `y` to add the marketplace, then pick a scope.
@@ -21,7 +21,7 @@ Answer `y` to add the marketplace, then pick a scope.
 From a shell:
 
 ```
-claude plugin install chat-reply --marketplace Miguelzvd/claude-code-chat-reply
+claude plugin install chat-reply --marketplace Miguelzvd/miguelzvd-claude-code-plugins
 ```
 
 ## Limitations
