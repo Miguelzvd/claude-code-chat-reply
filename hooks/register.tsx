@@ -182,7 +182,7 @@ export const register: Register = on => {
     const offset = await read($, top)
     const open = await read($, expanded)
 
-    if (e.props.hasSurvey || (text === null && pending === null)) {
+    if (e.props.hasSurvey) {
       return next(e)
     }
 
@@ -226,8 +226,11 @@ export const register: Register = on => {
             )}
           </Box>
         )}
-        {text !== null && (
-          <Box>
+        {/* One row stays reserved for the button: it showing or hiding must not shift the chat. */}
+        <Box height={1}>
+          {text === null ? (
+            <Text> </Text>
+          ) : (
             <Button
               key="reply"
               label="💬 Reply"
@@ -239,8 +242,8 @@ export const register: Register = on => {
                 await update($, picked, () => null)
               }}
             />
-          </Box>
-        )}
+          )}
+        </Box>
       </Box>
     )
   })
