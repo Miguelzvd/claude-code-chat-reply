@@ -10,6 +10,9 @@ const MAX_LINES = 4
 // Hovering a selection's edge makes the answer flap to undefined for a moment.
 const GRACE_MS = 600
 
+// Prompt box, footer and notices are not conversation: a selection there is never quoted.
+const CHROME_LINE = /shift\+tab|auto mode|accept edits|\[[A-Z]+:[A-Z]+\]|\bctx\b|copied \d+ chars|💬 Reply|Remove reply|^\s*[❯>]\s*$|[─━]{4}/
+
 const HEADER = '[Replying to this excerpt from the conversation:]\n'
 
 const quote = (text: string) =>
@@ -73,6 +76,23 @@ export const register: Register = on => {
   let dismissed: string | null = null
   let current: string | null = null
   let lastSeenAt = 0
+  let draft = ''
+
+  // A selection in one transcript row carries a requestId. Without one it may reach into the prompt or
+  // footer, or the Reply button that shifted the layout: drop those lines and keep the chat text.
+  const clean = (sel: { text: string; requestId?: string }) => {
+    if (sel.requestId !== undefined) {
+      return sel.text.trim() || null
+    }
+
+    const text = sel.text
+      .split('\n')
+      .filter(line => !CHROME_LINE.test(line))
+      .join('\n')
+      .trim()
+
+    return text !== '' && !(draft !== '' && draft.includes(text)) ? text : null
+  }
 
   const dismiss = () => {
     dismissed = current
@@ -87,7 +107,7 @@ export const register: Register = on => {
       while ((await read($, generation)) === mine) {
         const sel = await $.ui.selection()
         const now = await $.clock.now()
-        let raw = sel?.text.trim() || null
+        let raw = sel ? clean(sel) : null
 
         if (raw !== null) {
           lastSeenAt = now
@@ -117,14 +137,17 @@ export const register: Register = on => {
     return next(e)
   })
 
-  on('prompt.edit', ($, e, next) => {
+  on('prompt.edit', async ($, e, next) => {
     dismiss()
+    const result = await next(e)
+    draft = result.text
 
-    return next(e)
+    return result
   })
 
   on('prompt.submit', async ($, e, next) => {
     dismiss()
+    draft = ''
     const pending = await read($, reply)
 
     if (pending === null) {
