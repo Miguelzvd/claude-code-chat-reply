@@ -17,7 +17,7 @@ const VISIBLE_LINES = 5
 const GRACE_MS = 600
 
 // Prompt box, footer and notices are not conversation: a selection there is never quoted.
-const CHROME_LINE = /shift\+tab|auto mode|accept edits|\[[A-Z]+:[A-Z]+\]|\bctx\b|copied \d+ chars|💬 Reply|Remove reply|^\s*[❯>]\s*$|[─━]{4}/
+const CHROME_LINE = /shift\+tab|auto mode|accept edits|\[[A-Z]+:[A-Z]+\]|\bctx\b|copied \d+ chars|Reply selected|💬 Reply|Remove reply|^\s*[❯>]\s*$|[─━]{4}/
 
 const HEADER = '[Replying to this excerpt from the conversation:]\n'
 
@@ -233,7 +233,7 @@ export const register: Register = on => {
           ) : (
             <Button
               key="reply"
-              label="💬 Reply"
+              label="💬 Reply selected"
               onPress={async () => {
                 dismissed = text
                 await update($, reply, () => text)
