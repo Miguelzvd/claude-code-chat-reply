@@ -4,9 +4,15 @@ import type { Register } from 'claude-code'
 const picked = atom({ plugin: 'chat-reply', key: 'picked' } as const, null)
 const generation = atom({ plugin: 'chat-reply', key: 'generation' } as const, 0)
 const reply = atom({ plugin: 'chat-reply', key: 'reply' } as const, null)
+// First excerpt line the pinned box shows.
+const top = atom({ plugin: 'chat-reply', key: 'top' } as const, 0)
+// Whether the pinned box shows the whole excerpt instead of a scrolling window.
+// Sent replies the person opened, by transcript row.
+const opened = atom({ plugin: 'chat-reply', key: 'opened' } as const, {} as Record<string, boolean>)
+const expanded = atom({ plugin: 'chat-reply', key: 'expanded' } as const, false)
 
 const ACCENT = '#e8833a'
-const MAX_LINES = 4
+const VISIBLE_LINES = 5
 // Hovering a selection's edge makes the answer flap to undefined for a moment.
 const GRACE_MS = 600
 
@@ -65,12 +71,7 @@ const excerptBlock = (ui: { Box: any; Text: any }, lines: string[]) => {
   )
 }
 
-const preview = (text: string) => {
-  const lines = text.split('\n')
-  const shown = lines.slice(0, MAX_LINES)
-
-  return lines.length > MAX_LINES ? [...shown, `… +${lines.length - MAX_LINES} lines`] : shown
-}
+const clamp = (offset: number, count: number) => Math.max(0, Math.min(offset, count - VISIBLE_LINES))
 
 export const register: Register = on => {
   let dismissed: string | null = null
@@ -155,19 +156,42 @@ export const register: Register = on => {
     }
 
     await update($, reply, () => null)
+    await update($, top, () => 0)
+    await update($, expanded, () => false)
 
     return next({ ...e, text: quote(pending) + e.text })
+  })
+
+  // The wheel over the pinned excerpt moves its own window, not the band's.
+  on('ui.scroll', { component: 'AbovePrompt' }, async ($, e, next) => {
+    const pending = await read($, reply)
+    const count = pending === null ? 0 : pending.split('\n').length
+
+    if ((await read($, expanded)) || count <= VISIBLE_LINES || (e.pointer !== undefined && (e.pointer.row < 1 || e.pointer.row > VISIBLE_LINES))) {
+      return next(e)
+    }
+
+    await update($, top, offset => clamp(offset + e.by, count))
+
+    return {}
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const text = await read($, picked)
     const pending = await read($, reply)
+    const offset = await read($, top)
+    const open = await read($, expanded)
 
     if (e.props.hasSurvey || (text === null && pending === null)) {
       return next(e)
     }
 
     const { Box, Button, Text } = $.ui.resolve(e)
+    const lines = pending === null ? [] : pending.split('\n')
+    const from = open ? 0 : clamp(offset, lines.length)
+    const shown = open ? lines : lines.slice(from, from + VISIBLE_LINES)
+    const long = lines.length > VISIBLE_LINES
+    const move = (by: number) => update($, top, current => clamp(current + by, lines.length))
 
     return (
       <Box flexDirection="column">
@@ -175,9 +199,31 @@ export const register: Register = on => {
           <Box flexDirection="column">
             <Box>
               <Text color={ACCENT}>↩ Replying to </Text>
-              <Button key="clear" label="✕ Remove reply" onPress={() => update($, reply, () => null)} />
+              <Button
+                key="clear"
+                label="✕ Remove reply"
+                onPress={async () => {
+                  await update($, reply, () => null)
+                  await update($, top, () => 0)
+                  await update($, expanded, () => false)
+                }}
+              />
+              {long && (
+                <Button
+                  key="toggle"
+                  label={open ? '▴ Collapse' : '▾ Expand'}
+                  onPress={() => update($, expanded, value => !value)}
+                />
+              )}
             </Box>
-            {excerptBlock({ Box, Text }, preview(pending))}
+            {excerptBlock({ Box, Text }, shown)}
+            {long && !open && (
+              <Box>
+                <Button key="up" label="▲" onPress={() => move(-1)} />
+                <Button key="down" label="▼" onPress={() => move(1)} />
+                <Text dimColor>{` ${from + 1}-${from + VISIBLE_LINES} of ${lines.length}`}</Text>
+              </Box>
+            )}
           </Box>
         )}
         {text !== null && (
@@ -188,6 +234,8 @@ export const register: Register = on => {
               onPress={async () => {
                 dismissed = text
                 await update($, reply, () => text)
+                await update($, top, () => 0)
+                await update($, expanded, () => false)
                 await update($, picked, () => null)
               }}
             />
@@ -197,19 +245,31 @@ export const register: Register = on => {
     )
   })
 
-  on('ui.render', { component: 'UserMessage' }, ($, e, next) => {
+  on('ui.render', { component: 'UserMessage' }, async ($, e, next) => {
     const parsed = parseReply(e.props.text)
 
     if (parsed === null) {
       return next(e)
     }
 
-    const { Box, Text } = $.ui.resolve(e)
+    const { Box, Button, Text } = $.ui.resolve(e)
+    const long = parsed.excerpt.length > VISIBLE_LINES
+    const open = !long || (await read($, opened))[e.requestId] === true
+    const shown = open ? parsed.excerpt : parsed.excerpt.slice(0, VISIBLE_LINES)
 
     return (
       <Box flexDirection="column">
-        <Text color={ACCENT}>↩ Replying to</Text>
-        {excerptBlock({ Box, Text }, parsed.excerpt)}
+        <Box>
+          <Text color={ACCENT}>↩ Replying to </Text>
+          {long && (
+            <Button
+              key="toggle"
+              label={open ? '▴ Collapse' : `▾ Expand (${parsed.excerpt.length} lines)`}
+              onPress={() => update($, opened, rows => ({ ...rows, [e.requestId]: !open }))}
+            />
+          )}
+        </Box>
+        {excerptBlock({ Box, Text }, shown)}
         <Text>{parsed.message}</Text>
       </Box>
     )
