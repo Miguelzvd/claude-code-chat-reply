@@ -274,4 +274,32 @@ export const register: Register = on => {
       </Box>
     )
   })
+
+  // A Reply button under each block of the model's answer pins that block as the excerpt.
+  on('ui.render', { component: 'AssistantMessage' }, async ($, e, next) => {
+    const body = await next(e)
+
+    if (e.props.isSummary || e.props.text.trim() === '') {
+      return body
+    }
+
+    const { Box, Button } = $.ui.resolve(e)
+
+    return (
+      <Box flexDirection="column">
+        {body}
+        <Box>
+          <Button
+            key={`reply-${e.requestId}`}
+            label="💬 Reply"
+            onPress={async () => {
+              await update($, reply, () => e.props.text.trim())
+              await update($, top, () => 0)
+              await update($, expanded, () => false)
+            }}
+          />
+        </Box>
+      </Box>
+    )
+  })
 }
