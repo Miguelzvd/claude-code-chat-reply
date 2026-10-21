@@ -229,7 +229,7 @@ export const register: Register = on => {
         {/* One row stays reserved for the button: it showing or hiding must not shift the chat. */}
         <Box height={1}>
           {text === null ? (
-            <Text> </Text>
+            <Text dimColor>select text to reply</Text>
           ) : (
             <Button
               key="reply"
