@@ -71,6 +71,15 @@ const excerptBlock = (ui: { Box: any; Text: any }, lines: string[]) => {
   )
 }
 
+const SNIPPET_CHARS = 30
+
+// The selection on one line, cut to what fits beside the button.
+const snippet = (text: string) => {
+  const flat = text.replace(/\s+/g, ' ').trim()
+
+  return flat.length > SNIPPET_CHARS ? `${flat.slice(0, SNIPPET_CHARS - 1)}…` : flat
+}
+
 const clamp = (offset: number, count: number) => Math.max(0, Math.min(offset, count - VISIBLE_LINES))
 
 export const register: Register = on => {
@@ -105,32 +114,39 @@ export const register: Register = on => {
       const mine = (await $.clock.now()) + Math.random()
       await update($, generation, () => mine)
 
-      while ((await read($, generation)) === mine) {
-        const sel = await $.ui.selection()
-        const now = await $.clock.now()
-        let raw = sel ? clean(sel) : null
+      while ((await read($, generation).catch(() => mine)) === mine) {
+        // One refused $ call must not end the loop, or the button stops for the rest of the session.
+        try {
+          await tick()
+        } catch {}
 
-        if (raw !== null) {
-          lastSeenAt = now
-        } else if (current !== null && now - lastSeenAt < GRACE_MS) {
-          raw = current
-        }
+        await $.clock.sleep(150).catch(() => {})
+      }
+    }
 
-        if (raw === null) {
-          dismissed = null
-        }
+    const tick = async () => {
+      const sel = await $.ui.selection()
+      const now = await $.clock.now()
+      let raw = sel ? clean(sel) : null
 
-        if (raw !== current) {
-          current = raw
-        }
+      if (raw !== null) {
+        lastSeenAt = now
+      } else if (current !== null && now - lastSeenAt < GRACE_MS) {
+        raw = current
+      }
 
-        const text = raw !== null && raw !== dismissed ? raw : null
+      if (raw === null) {
+        dismissed = null
+      }
 
-        if (text !== (await read($, picked))) {
-          await update($, picked, () => text)
-        }
+      if (raw !== current) {
+        current = raw
+      }
 
-        await $.clock.sleep(150)
+      const text = raw !== null && raw !== dismissed ? raw : null
+
+      if (text !== (await read($, picked))) {
+        await update($, picked, () => text)
       }
     }
     void poll()
@@ -242,6 +258,11 @@ export const register: Register = on => {
                 await update($, picked, () => null)
               }}
             />
+          )}
+          {text !== null && (
+            <Text color={ACCENT} italic>
+              {` → ${snippet(text)}`}
+            </Text>
           )}
         </Box>
       </Box>
